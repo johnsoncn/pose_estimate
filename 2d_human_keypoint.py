@@ -26,8 +26,6 @@ def show_img_from_array(img):
     plt.imshow(img_RGB)
     plt.show()
 
-
-
 class PoseEstimate:
 
     def __init__(self):
@@ -45,25 +43,44 @@ class PoseEstimate:
         # pose estimation model
         self.pose_model = init_pose_model(self.pose_config, self.pose_checkpoint)
 
-    def object_detector(self, img_path):
+    def pose_detector(self, img_path, save_to):
 
-        # detection：coco格式 xyxy
+        # len(mmdet_results)：80  MS COCO目标检测数据集 80 个类别每个预测框的以下信息： detection：coco格式 xyxy
         mmdet_results = inference_detector(self.det_model, img_path)
-        # print(mmdet_results)
-        print(len(mmdet_results))
-        print(mmdet_results[0].shape)
-        print(mmdet_results[1].shape)
+        person_results = process_mmdet_results(mmdet_results, cat_id=1) # ms coco 行人ID为1，提取所有行人检测结果
+
+        # `top_down` pose estimate
+        # pose_results = {'bbox': [x,y,x,y,confidence], 'keypoints':[x,y,confidence]}
+        pose_results, returned_outputs = inference_top_down_pose_model(self.pose_model,
+                                                                       img_path,
+                                                                       person_results,
+                                                                       bbox_thr=0.3,
+                                                                       format='xyxy',
+                                                                       dataset='TopDownCocoDataset')
+        # 姿态估计结果可视化处理
+        vis_result = vis_pose_result(self.pose_model,
+                                     img_path,
+                                     pose_results,
+                                     radius=8,
+                                     thickness=3,
+                                     dataset='TopDownCocoDataset',
+                                     show=False)
+        print(vis_result)
+        cv2.imwrite(save_to, vis_result)
+        print(f'[INFO] save to {save_to}')
+
 
 if __name__ == "__main__":
     retval = os.getcwd()
     print(retval)
-    os.chdir('/home/dingchaofan//mmpose')
+    os.chdir('/home/dingchaofan/mmpose')
     retval = os.getcwd()
     print(retval)
 
     # wget https://zihao-openmmlab.obs.cn-east-3.myhuaweicloud.com/20220610-mmpose/images/multi-person.jpeg -O data/multi-person.jpeg
     img_path = '/home/dingchaofan/pose_estimate/data/multi-person.jpeg'
+    save_to = '/home/dingchaofan/pose_estimate/outputs/B1_multi_human.jpg'
 
     PE = PoseEstimate()
-    PE.object_detector(img_path=img_path)
+    PE.pose_detector(img_path=img_path, save_to=save_to)
 
